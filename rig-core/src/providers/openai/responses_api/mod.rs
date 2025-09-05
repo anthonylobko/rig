@@ -241,6 +241,18 @@ impl TryFrom<crate::completion::Message> for Vec<InputItem> {
                                 }),
                             })
                         }
+                        crate::message::UserContent::Image(rig::completion::message::Image {
+                            data,
+                            format: Some(rig::completion::message::ContentFormat::String),
+                            detail,
+                            ..
+                        }) => items.push(InputItem {
+                            role: Some(Role::User),
+                            input: InputContent::Message(Message::User {
+                                content: OneOrMany::one(UserContent::Image { image_url: data }),
+                                name: None,
+                            }),
+                        }),
                         _ => {
                             return Err(CompletionError::ProviderError(
                                 "This API only supports text and tool results at the moment"
@@ -1103,15 +1115,16 @@ pub enum UserContent {
     InputText {
         text: String,
     },
-    #[serde(rename = "image_url")]
+    #[serde(rename = "input_image")]
     Image {
-        image_url: ImageUrl,
+        image_url: String,
     },
     Audio {
         input_audio: InputAudio,
     },
-    #[serde(rename = "tool")]
+    #[serde(rename = "function_call")]
     ToolResult {
+        #[serde(rename = "call_id")]
         tool_call_id: String,
         output: String,
     },
@@ -1162,14 +1175,9 @@ impl TryFrom<message::Message> for Vec<Message> {
                             message::UserContent::Text(message::Text { text }) => {
                                 UserContent::InputText { text }
                             }
-                            message::UserContent::Image(message::Image {
-                                data, detail, ..
-                            }) => UserContent::Image {
-                                image_url: ImageUrl {
-                                    url: data,
-                                    detail: detail.unwrap_or_default(),
-                                },
-                            },
+                            message::UserContent::Image(message::Image { data, .. }) => {
+                                UserContent::Image { image_url: data }
+                            }
                             message::UserContent::Document(message::Document { data, .. }) => {
                                 UserContent::InputText { text: data }
                             }
