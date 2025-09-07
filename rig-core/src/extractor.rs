@@ -30,7 +30,7 @@
 
 use std::marker::PhantomData;
 
-use schemars::{JsonSchema, schema_for};
+use schemars::{JsonSchema, schema_for, transform::Transform};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -244,6 +244,16 @@ where
     _t: PhantomData<T>,
 }
 
+pub struct OneOfAnyOfTransform;
+
+impl schemars::transform::Transform for OneOfAnyOfTransform {
+    fn transform(&mut self, schema: &mut schemars::Schema) {
+        if let Some(one_of) = schema.remove("oneOf") {
+            schema.insert("anyOf".to_owned(), one_of);
+        }
+        schemars::transform::transform_subschemas(self, schema);
+    }
+}
 #[derive(Debug, thiserror::Error)]
 #[error("SubmitError")]
 struct SubmitError;
@@ -258,11 +268,13 @@ where
     type Output = T;
 
     async fn definition(&self, _prompt: String) -> ToolDefinition {
+        let mut schema = schema_for!(T);
+        OneOfAnyOfTransform.transform(&mut schema);
         ToolDefinition {
             name: Self::NAME.to_string(),
             description: "Submit the structured data you extracted from the provided text."
                 .to_string(),
-            parameters: json!(schema_for!(T)),
+            parameters: json!(schema),
         }
     }
 
